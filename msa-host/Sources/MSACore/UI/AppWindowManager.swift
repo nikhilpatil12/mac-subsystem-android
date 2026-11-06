@@ -119,6 +119,7 @@ public final class AppWindowManager {
                 proc.arguments = ["shell", "dumpsys window | grep mCurrentFocus"]
                 let pipe = Pipe()
                 proc.standardOutput = pipe
+                proc.standardError = Pipe()
                 if (try? proc.run()) != nil {
                     let data = pipe.fileHandleForReading.readDataToEndOfFile()
                     proc.waitUntilExit()
