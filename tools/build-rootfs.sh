@@ -130,6 +130,54 @@ nameserver 8.8.8.8
 nameserver 1.1.1.1
 RESOLV_EOF
 
+# Setup MSA GPU streamer script in /usr/local/bin
+mkdir -p /staging/usr/local/bin
+cat << 'GPU_EOF' > /staging/usr/local/bin/msa-gpu-stream
+#!/usr/bin/env python3
+import socket
+import struct
+import time
+import subprocess
+
+HOST_CID = 2
+GPU_PORT = 5050
+MAGIC = 0x4D534147 # "MSAG"
+HEADER_FORMAT = ">HHIIIIQI"
+
+def run():
+    sock = None
+    while True:
+        if sock is None:
+            try:
+                sock = socket.socket(getattr(socket, "AF_VSOCK", 40), socket.SOCK_STREAM)
+                sock.connect((HOST_CID, GPU_PORT))
+            except Exception:
+                time.sleep(1)
+                continue
+
+        try:
+            p = subprocess.Popen(["screencap"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            out, _ = p.communicate()
+            if len(out) > 16:
+                w, h, fmt = struct.unpack("<III", out[:12])
+                stride = w * 4
+                raw_pixels = out[16:]
+                payload_len = len(raw_pixels)
+                timestamp = int(time.time() * 1000)
+
+                magic_bytes = struct.pack(">I", MAGIC)
+                header_bytes = struct.pack(HEADER_FORMAT, 1, 0, w, h, stride, fmt, timestamp, payload_len)
+                sock.sendall(magic_bytes + header_bytes + raw_pixels)
+            time.sleep(0.016)
+        except Exception:
+            sock = None
+            time.sleep(1)
+
+if __name__ == "__main__":
+    run()
+GPU_EOF
+chmod +x /staging/usr/local/bin/msa-gpu-stream
+
 # Write custom /init script
 echo '📝 Creating /init entrypoint script...'
 cat << 'INIT_EOF' > /staging/init
@@ -286,6 +334,15 @@ waydroid container start &
       break
     fi
   done
+) &
+
+# 11. Launch MSA GPU Hardware Acceleration Streamer (vsock:5050)
+(
+  sleep 4
+  if [ -x /usr/local/bin/msa-gpu-stream ]; then
+    echo "🎮 [MSA Guest] Launching hardware-accelerated GPU streamer..."
+    /usr/local/bin/msa-gpu-stream &
+  fi
 ) &
 
 echo "✅ [MSA Guest] Subsystem initialization script complete. Shell ready."

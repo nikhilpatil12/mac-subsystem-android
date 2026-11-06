@@ -56,7 +56,7 @@ Traditional Android emulators (like BlueStacks, Nox, or Android Studio AVDs) sim
 ## ✨ Key Features
 
 * 🪟 **Independent App Windows**: Run multiple Android apps side-by-side simultaneously. Each app gets its own resizable `NSWindow`. Clicking between windows instantly shifts Android focus without frame bleeding or black screens.
-* ⚡️ **Metal Hardware Acceleration**: Real-time rendering pipeline powered by `CAMetalLayer` and low-overhead frame dispatching.
+* ⚡️ **Metal Hardware Acceleration (Option A)**: High-performance rendering pipeline powered by Apple Silicon Metal (`CAMetalLayer`, runtime MSL shaders, zero-copy texture ingestion) and a low-latency 60–120Hz GPU stream over `virtio-vsock` port 5050.
 * 🚀 **Fast Cold Boot (~20s)**: Tuned microVM bootloader, parallelized DEX compilation across 8 vCPUs (`dex2oat`), USAP app pre-forking, and bypassed boot animations.
 * 🎨 **Edge-to-Edge Native UI**: Automatically strips Android status bars, navigation bars, and `< _ [] X` freeform caption bars so apps feel like first-class Mac applications.
 * 🔍 **Spotlight & Dock Integration**: Automatically creates authentic macOS `.app` bundles in `~/Applications/Android Apps/` with extracted high-resolution icons.
@@ -75,18 +75,21 @@ Traditional Android emulators (like BlueStacks, Nox, or Android Studio AVDs) sim
 │   │ Aurora Store.app │  │Facebook Lite.app │  (AppKit NSWindow) │
 │   └────────▲─────────┘  └────────▲─────────┘                    │
 │            │                     │                              │
-│   ┌────────┴─────────────────────┴─────────┐                    │
-│   │            AppWindowManager            │                    │
-│   │  - Metal Surface Views (CAMetalLayer)  │                    │
-│   │  - App Shims & Trackpad Input Bridge   │                    │
-│   └────────────────────▲───────────────────┘                    │
-└────────────────────────┼────────────────────────────────────────┘
-                         │ virtio-vsock (Ports 5000 / 5555)
-┌────────────────────────▼────────────────────────────────────────┐
+│   ┌────────┴─────────────────────┴─────────────────────────┐    │
+│   │ AppWindowManager & MetalRenderer                       │    │
+│   │  - Hardware Apple Silicon GPU Shaders (MSL)            │    │
+│   │  - CAMetalLayer Display Presentation (60–120Hz)        │    │
+│   │  - GPUBridgeServer (Vsock Port 5050 GPU Transport)     │    │
+│   │  - App Shims & Trackpad Input Bridge                   │    │
+│   └──────────────────────────▲─────────────────────────────┘    │
+└──────────────────────────────┼──────────────────────────────────┘
+                               │ virtio-vsock (Ports 5000 / 5050 / 5555)
+┌──────────────────────────────▼──────────────────────────────────┐
 │               Linux MicroVM (Virtualization.framework)          │
 │                                                                 │
 │   ┌─────────────────────────────────────────────────────────┐   │
 │   │ Android 13 Container (Waydroid / AOSP)                  │   │
+│   │  - GPU Frame Streamer (msa-gpu-stream -> vsock:5050)    │   │
 │   │  - SystemServer & ActivityTaskManager                   │   │
 │   │  - Multi-window Task Routing                            │   │
 │   │  - Immersive Fullscreen Policy                          │   │

@@ -159,6 +159,7 @@ case "start":
             try await vm.start()
             if let socket = vm.socketDevice {
                 waylandServer.attach(to: socket)
+                GPUBridgeServer.shared.attach(to: socket)
                 ADBBridge.shared.start(with: socket)
             }
             print("✅ Subsystem started successfully. Ready for app connections.")

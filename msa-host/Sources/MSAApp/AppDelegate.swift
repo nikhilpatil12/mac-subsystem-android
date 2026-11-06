@@ -73,6 +73,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 try await manager.start()
                 if let socket = manager.socketDevice {
                     self.waylandServer.attach(to: socket)
+                    GPUBridgeServer.shared.attach(to: socket)
                     ADBBridge.shared.start(with: socket)
                 }
             } catch {

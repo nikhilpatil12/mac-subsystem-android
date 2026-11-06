@@ -12,6 +12,7 @@ public final class AndroidWindowController: NSWindowController {
     private var dragStart: (x: Double, y: Double)?
     private var dragStartTime: Date?
     private let cachedADBPath: String? = PackageInstaller.locateADB()
+    public private(set) var lastGPUFrameTime: Date?
 
     public init(package: String, title: String) {
         self.appPackage = package
@@ -91,7 +92,13 @@ public final class AndroidWindowController: NSWindowController {
                 let focused = await AppWindowManager.shared.currentFocusedPackage
 
                 if focused == targetPkg {
-                    // Foreground window: stream live at ~30 fps
+                    // If high-speed Metal GPU bridge stream is active, yield CPU and avoid redundant screencap
+                    if let lastGPU = await self?.lastGPUFrameTime, Date().timeIntervalSince(lastGPU) < 0.5 {
+                        try? await Task.sleep(nanoseconds: 30_000_000)
+                        continue
+                    }
+
+                    // Fallback screencap pipeline
                     let proc = Process()
                     proc.executableURL = URL(fileURLWithPath: adb)
                     proc.arguments = ["exec-out", "screencap"]
@@ -148,6 +155,22 @@ public final class AndroidWindowController: NSWindowController {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                 }
             }
+        }
+    }
+
+    public func didReceiveGPUFrame(_ packet: GPUFramePacket) {
+        lastGPUFrameTime = Date()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.currentAndroidWidth = Int(packet.width)
+            self.currentAndroidHeight = Int(packet.height)
+            self.metalView.renderGPU(
+                pixelData: packet.pixelData,
+                width: Int(packet.width),
+                height: Int(packet.height),
+                stride: Int(packet.stride),
+                format: packet.waylandFormat
+            )
         }
     }
 

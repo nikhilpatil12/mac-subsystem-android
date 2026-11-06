@@ -12,6 +12,7 @@ public final class AppWindowManager {
 
     private init() {
         startFocusMonitor()
+        GPUBridgeServer.shared.delegate = self
     }
 
     public func getOrCreateWindow(for packageName: String, title: String? = nil) -> AndroidWindowController {
@@ -164,5 +165,15 @@ public final class AppWindowManager {
         if package.contains("youtube") { return "YouTube" }
         let last = package.split(separator: ".").last ?? Substring(package)
         return last.capitalized
+    }
+}
+
+extension AppWindowManager: GPUBridgeServerDelegate {
+    public nonisolated func gpuBridgeServer(_ server: GPUBridgeServer, didReceiveFrame packet: GPUFramePacket) {
+        Task { @MainActor in
+            if let pkg = self.currentFocusedPackage, let win = self.windows[pkg] {
+                win.didReceiveGPUFrame(packet)
+            }
+        }
     }
 }
