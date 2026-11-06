@@ -93,7 +93,7 @@ public final class MetalRenderer: @unchecked Sendable {
         width: Int,
         height: Int,
         stride: Int,
-        format: WaylandShmFormat = .xbgr8888,
+        format: WaylandShmFormat = .rgba8888,
         to layer: CAMetalLayer
     ) -> Bool {
         guard let pipelineState = self.pipelineState,
@@ -107,7 +107,14 @@ public final class MetalRenderer: @unchecked Sendable {
         defer { lock.unlock() }
 
         // 1. Texture management: re-create only when dimensions change
-        let mtlFormat: MTLPixelFormat = (format == .argb8888 || format == .xrgb8888 || format == .xbgr8888) ? .bgra8Unorm : .rgba8Unorm
+        // Android and standard Linux framebuffers use RGBA byte ordering ([R, G, B, A]).
+        let mtlFormat: MTLPixelFormat
+        switch format {
+        case .argb8888, .xrgb8888:
+            mtlFormat = .bgra8Unorm
+        case .rgba8888, .rgbx8888, .xbgr8888, .abgr8888:
+            mtlFormat = .rgba8Unorm
+        }
         if currentTexture == nil || textureWidth != width || textureHeight != height || currentTexture?.pixelFormat != mtlFormat {
             let desc = MTLTextureDescriptor.texture2DDescriptor(
                 pixelFormat: mtlFormat,

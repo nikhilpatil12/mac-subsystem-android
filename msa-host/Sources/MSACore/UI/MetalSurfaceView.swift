@@ -48,7 +48,7 @@ public final class MetalSurfaceView: NSView {
     }
 
     /// Primary GPU render path via Metal hardware acceleration
-    public func renderGPU(pixelData: Data, width: Int, height: Int, stride: Int, format: WaylandShmFormat = .xbgr8888) {
+    public func renderGPU(pixelData: Data, width: Int, height: Int, stride: Int, format: WaylandShmFormat = .rgba8888) {
         guard let layer = self.metalLayer, let renderer = self.renderer else {
             return
         }

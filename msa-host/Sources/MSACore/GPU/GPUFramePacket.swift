@@ -101,13 +101,13 @@ public struct GPUFramePacket: Sendable {
     }
 
     public var waylandFormat: WaylandShmFormat {
+        // Android HAL_PIXEL_FORMAT_RGBA_8888 = 1, RGBX_8888 = 2
         switch format {
         case 0: return .argb8888
-        case 1: return .xrgb8888
-        case 2: return .abgr8888
-        case 3: return .xbgr8888
+        case 1, 2: return .rgba8888
+        case 3: return .abgr8888
         case 4: return .rgba8888
-        default: return .xbgr8888
+        default: return .rgba8888
         }
     }
 }

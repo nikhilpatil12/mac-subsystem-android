@@ -135,7 +135,7 @@ public final class AndroidWindowController: NSWindowController {
                                     width: w,
                                     height: effectiveHeight,
                                     stride: rowBytes,
-                                    format: .xbgr8888,
+                                    format: .rgba8888,
                                     data: pixelData
                                 )
 

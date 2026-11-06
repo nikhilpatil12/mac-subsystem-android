@@ -128,7 +128,7 @@ final class MSACoreTests: XCTestCase {
             width: 2,
             height: 2,
             stride: 8,
-            format: 3, // xbgr8888
+            format: 1, // Android RGBA8888
             timestamp: 123456789,
             pixelData: data
         )
@@ -142,10 +142,10 @@ final class MSACoreTests: XCTestCase {
         XCTAssertEqual(parsed?.width, 2)
         XCTAssertEqual(parsed?.height, 2)
         XCTAssertEqual(parsed?.stride, 8)
-        XCTAssertEqual(parsed?.format, 3)
+        XCTAssertEqual(parsed?.format, 1)
         XCTAssertEqual(parsed?.timestamp, 123456789)
         XCTAssertEqual(parsed?.pixelData, data)
-        XCTAssertEqual(parsed?.waylandFormat, .xbgr8888)
+        XCTAssertEqual(parsed?.waylandFormat, .rgba8888)
         XCTAssertEqual(serialized.count, 0, "Buffer should be consumed after parsing")
     }
 
