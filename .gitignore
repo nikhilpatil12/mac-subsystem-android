@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Xcode & Swift Package Manager
+.build/
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+.swiftpm/
+Package.resolved
+
+# Linux Kernel & Toolchain Builds
+linux-*/
+*.tar.xz
+*.tar.gz
+*.tar.bz2
+*.config.old
+
+# Virtual Machine Images & Disk Artifacts
+*.img
+*.iso
+*.qcow2
+*.vmdk
+*.raw
+vmlinuz*
+initrd*
+*.bak
+*.tmp
+
+# Temporary files & Logs
+*.log
+/tmp/msa_*
+.msa_cache/
+
+# Local Secrets & Credentials
+*.pem
+*.key
+.env
+.env.*
