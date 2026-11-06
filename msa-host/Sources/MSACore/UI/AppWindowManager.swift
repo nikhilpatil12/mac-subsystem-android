@@ -41,6 +41,20 @@ public final class AppWindowManager {
         windows.removeValue(forKey: packageName)
     }
 
+    /// Called by AndroidWindowController when the user clicks the red close button.
+    /// Removes the window from tracking and force-stops the Android package.
+    public func closeWindow(for packageName: String) {
+        windows.removeValue(forKey: packageName)
+        guard let adb = PackageInstaller.locateADB() else { return }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let killProc = Process()
+            killProc.executableURL = URL(fileURLWithPath: adb)
+            killProc.arguments = ["shell", "am", "force-stop", packageName]
+            try? killProc.run()
+            killProc.waitUntilExit()
+        }
+    }
+
     public func window(for packageName: String) -> AndroidWindowController? {
         return windows[packageName]
     }

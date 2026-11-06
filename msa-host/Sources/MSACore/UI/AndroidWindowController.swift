@@ -6,8 +6,8 @@ public final class AndroidWindowController: NSWindowController {
     private var metalView: MetalSurfaceView!
     private var streamTask: Task<Void, Never>?
     private var currentAndroidWidth: Int = 540
-    private var currentAndroidHeight: Int = 896
-    private var captionOffset: Int = 64
+    private var currentAndroidHeight: Int = 960
+    private var captionOffset: Int = 0
     private var lastFrozenBuffer: WaylandBuffer?
     private var dragStart: (x: Double, y: Double)?
     private var dragStartTime: Date?
@@ -36,6 +36,24 @@ public final class AndroidWindowController: NSWindowController {
         window.acceptsMouseMovedEvents = true
         window.center()
 
+        // Configure app icon for window miniaturization Dock tile
+        let appIcon = IconManager.shared.icon(for: package, title: title)
+        window.miniwindowImage = appIcon
+
+        // Wire window control buttons directly to ensure responsive clicks
+        if let closeBtn = window.standardWindowButton(.closeButton) {
+            closeBtn.target = self
+            closeBtn.action = #selector(handleCloseButtonClicked)
+        }
+        if let minBtn = window.standardWindowButton(.miniaturizeButton) {
+            minBtn.target = self
+            minBtn.action = #selector(handleMiniaturizeButtonClicked)
+        }
+        if let zoomBtn = window.standardWindowButton(.zoomButton) {
+            zoomBtn.target = self
+            zoomBtn.action = #selector(handleZoomButtonClicked)
+        }
+
         let view = MetalSurfaceView(frame: window.contentView!.bounds)
         view.autoresizingMask = [.width, .height]
         self.metalView = view
@@ -56,6 +74,30 @@ public final class AndroidWindowController: NSWindowController {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    @objc private func handleCloseButtonClicked() {
+        closeWindow()
+    }
+
+    @objc private func handleMiniaturizeButtonClicked() {
+        window?.miniaturize(nil)
+    }
+
+    @objc private func handleZoomButtonClicked() {
+        window?.zoom(nil)
+    }
+
+    public func closeWindow() {
+        streamTask?.cancel()
+        streamTask = nil
+        surface.close()
+        if let pkg = appPackage {
+            Task { @MainActor in
+                AppWindowManager.shared.closeWindow(for: pkg)
+            }
+        }
+        window?.close()
     }
 
     private func configureDisplayIfNeeded() {
@@ -116,9 +158,10 @@ public final class AndroidWindowController: NSWindowController {
                             let h = Int(data.withUnsafeBytes { $0.load(fromByteOffset: 4, as: UInt32.self) })
                             let rowBytes = w * 4
 
-                            let cropY = 64
-                            let effectiveHeight = max(100, h - cropY)
-                            let startOffset = 16 + (cropY * rowBytes)
+                            // Zero top crop: render full height including app header and search bar
+                            let cropY = 0
+                            let effectiveHeight = h
+                            let startOffset = 16
                             let endOffset = startOffset + (effectiveHeight * rowBytes)
 
                             if startOffset < data.count && endOffset <= data.count {
@@ -127,7 +170,7 @@ public final class AndroidWindowController: NSWindowController {
                                 await MainActor.run {
                                     self?.currentAndroidWidth = w
                                     self?.currentAndroidHeight = effectiveHeight
-                                    self?.captionOffset = cropY
+                                    self?.captionOffset = 0
                                 }
 
                                 let buffer = WaylandBuffer(
@@ -196,7 +239,7 @@ public final class AndroidWindowController: NSWindowController {
             let normY = max(0.0, min(1.0, y / Double(winHeight)))
 
             let targetX = Int(normX * Double(self.currentAndroidWidth))
-            let targetY = self.captionOffset + Int(normY * Double(self.currentAndroidHeight))
+            let targetY = Int(normY * Double(self.currentAndroidHeight))
 
             if case .buttonDown = type {
                 self.dragStart = (x: Double(targetX), y: Double(targetY))
@@ -296,29 +339,19 @@ extension AndroidWindowController: WaylandSurfaceObserver {
 
     public func surfaceDidClose(_ surface: WaylandSurface) {
         DispatchQueue.main.async { [weak self] in
-            self?.streamTask?.cancel()
-            self?.close()
+            self?.closeWindow()
         }
     }
 }
 
 extension AndroidWindowController: NSWindowDelegate {
+    public func windowShouldClose(_ sender: NSWindow) -> Bool {
+        closeWindow()
+        return true
+    }
+
     public func windowWillClose(_ notification: Notification) {
-        streamTask?.cancel()
-        surface.close()
-        if let pkg = appPackage {
-            Task { @MainActor in
-                AppWindowManager.shared.removeWindow(for: pkg)
-            }
-            if let adb = cachedADBPath {
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let killProc = Process()
-                    killProc.executableURL = URL(fileURLWithPath: adb)
-                    killProc.arguments = ["shell", "am", "force-stop", pkg]
-                    try? killProc.run()
-                }
-            }
-        }
+        closeWindow()
     }
 
     public func windowDidBecomeKey(_ notification: Notification) {
@@ -328,22 +361,13 @@ extension AndroidWindowController: NSWindowDelegate {
                     AppWindowManager.shared.bringToFront(package: pkg)
                 }
             }
+            let icon = IconManager.shared.icon(for: pkg, title: window?.title)
+            NSApplication.shared.applicationIconImage = icon
         }
     }
 
     public func windowDidResize(_ notification: Notification) {
         guard let size = window?.contentView?.bounds.size else { return }
         surface.requestResize(width: Int32(size.width), height: Int32(size.height))
-
-        let targetW = max(360, (Int(size.width * 1.5) / 2) * 2)
-        let targetH = max(480, (Int(size.height * 1.5) / 2) * 2)
-
-        DispatchQueue.global(qos: .userInitiated).async { [adbPath = self.cachedADBPath] in
-            guard let adb = adbPath else { return }
-            let resizeProc = Process()
-            resizeProc.executableURL = URL(fileURLWithPath: adb)
-            resizeProc.arguments = ["shell", "wm", "size", "\(targetW)x\(targetH)"]
-            try? resizeProc.run()
-        }
     }
 }
